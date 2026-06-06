@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoAI — Editor Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b10;
+    --surface: #0e1318;
+    --border: #1a2230;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --text: #e2e8f0;
+    --muted: #4a5568;
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 56px;
+    animation: fadeDown 0.6s ease forwards;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 32px;
+    font-size: 12px;
+    animation: fadeUp 0.6s ease 0.1s forwards;
+    opacity: 0;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+
+  .dot.connected { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot.error { background: var(--error); }
+
+  /* Grid layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.6s ease 0.2s forwards;
+    opacity: 0;
+  }
+
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: rgba(0,229,255,0.2); }
+
+  .card-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.04);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon { font-size: 32px; margin-bottom: 12px; }
+
+  .upload-text {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .upload-text strong { color: var(--text); display: block; margin-bottom: 4px; }
+
+  /* File list */
+  .file-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 6px;
+    font-size: 11px;
+  }
+
+  .file-item .file-name { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-item .file-size { color: var(--muted); }
+  .file-item .remove-btn { cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; }
+  .file-item .remove-btn:hover { color: var(--error); }
+
+  /* Progress */
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  /* Command panel */
+  .command-panel {
+    grid-column: 1 / -1;
+    animation: fadeUp 0.6s ease 0.3s forwards;
+    opacity: 0;
+  }
+
+  .command-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    resize: none;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+
+  .command-input:focus { border-color: var(--accent); }
+  .command-input::placeholder { color: var(--muted); }
+
+  /* Quick commands */
+  .quick-cmds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .quick-cmd {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .quick-cmd:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  /* Action button */
+  .action-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .action-btn:hover { opacity: 0.9; }
+  .action-btn:active { transform: scale(0.99); }
+  .action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Log / Output */
+  .log-panel {
+    animation: fadeUp 0.6s ease 0.4s forwards;
+    opacity: 0;
+  }
+
+  .log-box {
+    background: #04060a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 180px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .log-line { display: flex; gap: 12px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg { color: var(--text); }
+  .log-msg.success { color: var(--success); }
+  .log-msg.error { color: var(--error); }
+  .log-msg.info { color: var(--accent); }
+  .log-msg.warn { color: var(--warning); }
+
+  /* Result panel */
+  .result-panel {
+    display: none;
+    margin-top: 24px;
+    padding: 20px 24px;
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 12px;
+    animation: fadeUp 0.4s ease forwards;
+  }
+
+  .result-panel.show { display: block; }
+
+  .result-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--success);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--success);
+    color: #000;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+
+  .download-btn:hover { opacity: 0.85; }
+
+  /* Server config */
+  .config-card {
+    animation: fadeUp 0.6s ease 0.15s forwards;
+    opacity: 0;
+    margin-bottom: 24px;
+  }
+
+  .config-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .config-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-input:focus { border-color: var(--accent); }
+
+  .config-btn {
+    padding: 10px 16px;
+    background: var(--border);
+    border: none;
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .config-btn:hover { background: rgba(0,229,255,0.15); color: var(--accent); }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: none;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎬</div>
+      <h1>VideoAI</h1>
+    </div>
+    <div class="tagline">// editor de vídeo com inteligência artificial</div>
+  </header>
+
+  <!-- Server Config -->
+  <div class="card config-card">
+    <div class="card-label">⚙ Servidor Backend</div>
+    <div class="config-row">
+      <input class="config-input" id="serverUrl" value="http://localhost:8000" placeholder="URL do servidor">
+      <button class="config-btn" onclick="checkConnection()">Testar Conexão</button>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Verificando conexão com o servidor...</span>
+  </div>
+
+  <!-- Upload + Vídeos -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-label">📁 Vídeos</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" multiple accept="video/*,audio/*" onchange="handleFiles(this.files)">
+        <div class="upload-icon">⬆</div>
+        <div class="upload-text">
+          <strong>Soltar vídeos aqui</strong>
+          clique ou arraste arquivos<br>MP4, MOV, AVI, MKV
+        </div>
+      </div>
+      <div class="progress-bar" id="uploadProgress">
+        <div class="progress-fill" id="uploadFill"></div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">🎛 Comandos Rápidos</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+        <div class="quick-cmd" onclick="setCmd('Cortar do segundo 10 até o segundo 30')">✂ Cortar trecho</div>
+        <div class="quick-cmd" onclick="setCmd('Juntar todos os vídeos em sequência')">🔗 Juntar vídeos</div>
+        <div class="quick-cmd" onclick="setCmd('Deixar em preto e branco com estilo vintage')">🎞 Efeito vintage</div>
+        <div class="quick-cmd" onclick="setCmd('Melhorar a qualidade e nitidez do vídeo')">✨ Melhorar qualidade</div>
+        <div class="quick-cmd" onclick="setCmd('Adicionar o áudio do segundo arquivo sobre o vídeo')">🎵 Adicionar música</div>
+        <div class="quick-cmd" onclick="setCmd('Remover o áudio original do vídeo')">🔇 Remover áudio</div>
+        <div class="quick-cmd" onclick="setCmd('Deixar o vídeo em velocidade 2x mais rápido')">⚡ Acelerar 2x</div>
+        <div class="quick-cmd" onclick="setCmd('Aumentar o brilho e contraste do vídeo')">💡 Brilho e contraste</div>
+      </div>
+    </div>
+
+    <!-- Command Panel -->
+    <div class="card command-panel">
+      <div class="card-label">💬 Diga o que quer fazer</div>
+      <textarea 
+        class="command-input" 
+        id="commandInput" 
+        placeholder="Ex: Corta o vídeo do segundo 15 até o segundo 45 e adiciona um efeito de filme antigo..."
+      ></textarea>
+      <div class="quick-cmds" id="suggestBox"></div>
+      <button class="action-btn" id="processBtn" onclick="processVideo()">
+        <div class="spinner" id="btnSpinner"></div>
+        <span id="btnText">▶ Processar Vídeo</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="card log-panel">
+    <div class="card-label">📋 Log de Operações</div>
+    <div class="log-box" id="logBox">
+      <div class="log-line">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg info">VideoAI inicializado. Aguardando comandos...</span>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-panel" id="resultPanel">
+      <div class="result-title">✅ Vídeo processado com sucesso!</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;" id="resultDesc"></p>
+      <a class="download-btn" id="downloadBtn" href="#" download>⬇ Baixar Vídeo</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let uploadedFiles = [];
+  let serverUrl = 'http://localhost:8000';
+
+  // Init
+  window.onload = () => {
+    serverUrl = document.getElementById('serverUrl').value;
+    checkConnection();
+    setupDragDrop();
+  };
+
+  function getServerUrl() {
+    return document.getElementById('serverUrl').value.replace(/\/$/, '');
+  }
+
+  async function checkConnection() {
+    serverUrl = getServerUrl();
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    dot.className = 'dot';
+    txt.textContent = 'Conectando...';
+    try {
+      const r = await fetch(`${serverUrl}/health`, { signal: AbortSignal.timeout(5000) });
+      if (r.ok) {
+        dot.className = 'dot connected';
+        txt.textContent = `Servidor conectado — ${serverUrl}`;
+        log('Servidor backend conectado com sucesso.', 'success');
+      } else { throw new Error(); }
+    } catch {
+      dot.className = 'dot error';
+      txt.textContent = 'Servidor offline — inicie o backend primeiro';
+      log('Servidor não encontrado. Verifique se o backend está rodando.', 'error');
+    }
+  }
+
+  function setupDragDrop() {
+    const zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      handleFiles(e.dataTransfer.files);
+    });
+  }
+
+  async function handleFiles(files) {
+    const bar = document.getElementById('uploadProgress');
+    const fill = document.getElementById('uploadFill');
+    bar.style.display = 'block';
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      log(`Enviando: ${file.name}...`, 'info');
+      fill.style.width = '30%';
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const r = await fetch(`${getServerUrl()}/upload`, { method: 'POST', body: form });
+        const data = await r.json();
+        fill.style.width = '100%';
+
+        if (data.file_id) {
+          uploadedFiles.push({ id: data.file_id, name: file.name, size: file.size });
+          renderFiles();
+          log(`✓ ${file.name} enviado (ID: ${data.file_id})`, 'success');
+        }
+      } catch {
+        log(`Erro ao enviar ${file.name}. Servidor offline?`, 'error');
+      }
+    }
+
+    setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0%'; }, 1000);
+  }
+
+  function renderFiles() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = uploadedFiles.map((f, i) => `
+      <div class="file-item">
+        <span>🎬</span>
+        <span class="file-name">${f.name}</span>
+        <span class="file-size">${formatSize(f.size)}</span>
+        <span class="remove-btn" onclick="removeFile(${i})">×</span>
+      </div>
+    `).join('');
+  }
+
+  function removeFile(i) {
+    uploadedFiles.splice(i, 1);
+    renderFiles();
+  }
+
+  function formatSize(b) {
+    if (b > 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1024).toFixed(0) + ' KB';
+  }
+
+  function setCmd(text) {
+    document.getElementById('commandInput').value = text;
+  }
+
+  async function processVideo() {
+    const command = document.getElementById('commandInput').value.trim();
+    if (!command) { log('Digite um comando primeiro.', 'warn'); return; }
+    if (uploadedFiles.length === 0) { log('Adicione pelo menos um vídeo.', 'warn'); return; }
+
+    setLoading(true);
+    document.getElementById('resultPanel').classList.remove('show');
+    log(`Comando: "${command}"`, 'info');
+    log('Interpretando com IA...', 'info');
+
+    const form = new FormData();
+    form.append('file_ids', JSON.stringify(uploadedFiles.map(f => f.id)));
+    form.append('command', command);
+
+    try {
+      const r = await fetch(`${getServerUrl()}/process`, { method: 'POST', body: form });
+      const data = await r.json();
+
+      if (data.error) {
+        log(`Erro: ${data.error}`, 'error');
+      } else {
+        log(`Ação: ${data.action} — ${data.description}`, 'success');
+        log(`Vídeo processado: ${data.output_id}`, 'success');
+        showResult(data);
+      }
+    } catch (e) {
+      log('Erro de conexão com o servidor.', 'error');
+    }
+
+    setLoading(false);
+  }
+
+  function showResult(data) {
+    const panel = document.getElementById('resultPanel');
+    const desc = document.getElementById('resultDesc');
+    const btn = document.getElementById('downloadBtn');
+    desc.textContent = data.description;
+    btn.href = `${getServerUrl()}/download/${data.output_id}`;
+    btn.download = `videoai_${data.output_id}`;
+    panel.classList.add('show');
+  }
+
+  function setLoading(v) {
+    const btn = document.getElementById('processBtn');
+    const spinner = document.getElementById('btnSpinner');
+    const txt = document.getElementById('btnText');
+    btn.disabled = v;
+    spinner.style.display = v ? 'block' : 'none';
+    txt.textContent = v ? 'Processando...' : '▶ Processar Vídeo';
+  }
+
+  function log(msg, type = '') {
+    const box = document.getElementById('logBox');
+    const now = new Date().toLocaleTimeString('pt-BR');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+</script>
+</body>
+</html>
